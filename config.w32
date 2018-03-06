@@ -1,0 +1,13 @@
+// $Id$
+// vim:ft=javascript
+
+// If your extension references something external, use ARG_WITH
+// ARG_WITH("elasticsearch", "for elasticsearch support", "no");
+
+// Otherwise, use ARG_ENABLE
+// ARG_ENABLE("elasticsearch", "enable elasticsearch support", "no");
+
+if (PHP_ELASTICSEARCH != "no") {
+	EXTENSION("elasticsearch", "elasticsearch.c", PHP_EXTNAME_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+}
+
