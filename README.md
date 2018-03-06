@@ -36,6 +36,17 @@ $es->setEsConfig("http://172.16.16.221", 9200);
 ~~~
 
 
+### get Methods
+-----
+_**Description**_: get.
+
+##### *Example*
+
+~~~
+$id = "AVyqzrcLD0y03jdznsAG";
+$info = $es->get("user_index/user", $id);
+~~~
+
 ### search Methods
 -----
 _**Description**_: search.
@@ -55,17 +66,17 @@ _**Description**_: update.
 
 ~~~
 $update_data = "{\"doc\" : {\"custom_id\":60}}";
-//$info = $es->update("user_index/user", $id, $update_data);
+$info = $es->update("user_index/user", $id, $update_data);
 ~~~
 
-### update Methods
+### delete Methods
 -----
-_**Description**_: update.
+_**Description**_: delete.
 
 ##### *Example*
 
 ~~~
-$update_data = "{\"doc\" : {\"custom_id\":60}}";
-//$info = $es->update("user_index/user", $id, $update_data);
+$id = "AVyqzrcLD0y03jdznsAG";
+$info = $es->delete("user_index/user", $id);
 ~~~
 
