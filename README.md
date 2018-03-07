@@ -35,8 +35,6 @@ _**Description**_: Set ElasticSearch host and port.
 $es->setEsConfig("http://172.16.16.221", 9200);
 ~~~
 
-
-
 ### index method
 -----
 _**Description**_: index.
@@ -65,8 +63,6 @@ _**Description**_: bulk.
 $data = ... ;  // ES JSON FORMAT
 $info = $es->bulk("your_index/your_type", $data);
 ~~~
-
-
 
 ### get method
 -----

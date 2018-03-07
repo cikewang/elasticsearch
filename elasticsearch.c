@@ -53,7 +53,7 @@ PHP_INI_END()
 
 /* Every user-visible function in PHP should document itself in the source */
 /* {{{ proto string confirm_elasticsearch_compiled(string arg)
-   Return a string to confirm that the module is compiled in */
+   Return a string to confirm that the module is compiled in
 PHP_FUNCTION(confirm_elasticsearch_compiled)
 {
 	char *arg = NULL;
@@ -67,7 +67,7 @@ PHP_FUNCTION(confirm_elasticsearch_compiled)
 	strg = strpprintf(0, "Congratulations! You have successfully modified ext/%.78s/config.m4. Module %.78s is now compiled into PHP.", "elasticsearch", arg);
 
 	RETURN_STR(strg);
-}
+}*/
 /* }}} */
 /* The previous line is meant for vim and emacs, so it can correctly fold and
    unfold functions in source code. See the corresponding marks just before
@@ -93,6 +93,7 @@ struct ResponseStruct {
 	size_t size;
 } response_info;
 
+/** {{{ static size_t WriteResponseCallback(void *contents, size_t size, size_t nmemb, void *userp) */
 static size_t WriteResponseCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
 	size_t realsize = size * nmemb;
@@ -111,8 +112,9 @@ static size_t WriteResponseCallback(void *contents, size_t size, size_t nmemb, v
 
 	return realsize;
 }
+/* }}} */
 
-//const char *method, const char *url, const char *data
+/** {{{ static void curl_es(char *methed, char *url, char *data) */
 static void curl_es(char *methed, char *url, char *data)
 {
 	CURL *curl;
@@ -155,13 +157,12 @@ static void curl_es(char *methed, char *url, char *data)
 		php_error_docref(NULL, E_WARNING, "curl_easy_init() failed: %s\n", curl_easy_strerror(res));
 	}
 }
+/* }}} */
 
 zend_class_entry *es_class;
 
-/**
- * set elasticsearch configuration info
- */
-ZEND_METHOD(ElasticSearch, setEsConfig)
+/* {{{ proto public Elasticsearch::setEsConfig($host, $port) */
+PHP_METHOD(Elasticsearch, setEsConfig)
 {
 	zval *host;
 	zend_long *port;
@@ -181,11 +182,10 @@ ZEND_METHOD(ElasticSearch, setEsConfig)
 	url = strpprintf(0, "%s:%d", ZSTR_VAL(_host), port);
 	ELASTICSEARCH_G(global_url) = ZSTR_VAL(url);
 }
+/* }}} */
 
-/**
- * get elasticsearch configuration info
- */
-ZEND_METHOD(ElasticSearch, getEsConfig)
+/* {{{ proto public Elasticsearch::getEsConfig() */
+PHP_METHOD(Elasticsearch, getEsConfig)
 {
 	zval *host, *port, *rh, *rp;
 	zend_string *host_string, *url;
@@ -200,11 +200,10 @@ ZEND_METHOD(ElasticSearch, getEsConfig)
 	url = strpprintf(0, "%s:%d", ZSTR_VAL(host_string), port_long);
 	RETVAL_STR(url);
 }
+/* }}} */
 
-/**
- * get host info
- */
-ZEND_METHOD(ElasticSearch, getHost)
+/* {{{ proto public Elasticsearch::getHost() */
+PHP_METHOD(Elasticsearch, getHost)
 {
 	zval *self = getThis();
 	zval *name;
@@ -212,11 +211,10 @@ ZEND_METHOD(ElasticSearch, getHost)
 	name = zend_read_property(Z_OBJCE_P(self), self, ZEND_STRL("_host"), 0, rv);
 	RETURN_STR(name->value.str);
 }
+/* }}} */
 
-/**
- * ES index method
- */
-ZEND_METHOD(ElasticSearch, index)
+/* {{{ proto public Elasticsearch::index($index_type, $data, $id) */
+PHP_METHOD(Elasticsearch, index)
 {
 	zend_string *url_string, *index_type, *data, *id = NULL;
 
@@ -238,11 +236,10 @@ ZEND_METHOD(ElasticSearch, index)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
-/**
- * ES bulk method (Batch create document)
- */
-ZEND_METHOD(ElasticSearch, bulk)
+/* {{{ proto public Elasticsearch::bulk($index_type, $data) */
+PHP_METHOD(Elasticsearch, bulk)
 {
 	zend_string *url_string, *index_type, *data;
 
@@ -259,11 +256,10 @@ ZEND_METHOD(ElasticSearch, bulk)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
-/**
- * ES get method
- */
-ZEND_METHOD(ElasticSearch, get)
+/* {{{ proto public Elasticsearch::get($index_type, $id) */
+PHP_METHOD(Elasticsearch, get)
 {
 	zend_string *url_string, *index_type, *id;
 	char *data = "NULL";
@@ -281,11 +277,10 @@ ZEND_METHOD(ElasticSearch, get)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
-/**
- * ES get method (Batch access document)
- */
-ZEND_METHOD(ElasticSearch, mget)
+/* {{{ proto public Elasticsearch::mget($index_type, $data) */
+PHP_METHOD(Elasticsearch, mget)
 {
 	zend_string *url_string, *index_type, *data;
 
@@ -302,11 +297,10 @@ ZEND_METHOD(ElasticSearch, mget)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
-/**
- * ES search method
- */
-ZEND_METHOD(ElasticSearch, search)
+/* {{{ proto public Elasticsearch::search($index_type, $data) */
+PHP_METHOD(Elasticsearch, search)
 {
 	zend_string *url_string, *index_type, *data;
 
@@ -323,11 +317,10 @@ ZEND_METHOD(ElasticSearch, search)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
-/**
- * ES update method
- */
-ZEND_METHOD(ElasticSearch, update)
+/* {{{ proto public Elasticsearch::update($index_type, $id, $data) */
+PHP_METHOD(Elasticsearch, update)
 {
 	zend_string *url_string, *index_type, *id, *data;
 
@@ -344,11 +337,10 @@ ZEND_METHOD(ElasticSearch, update)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
-/**
- * ES delete method
- */
-ZEND_METHOD(ElasticSearch, delete)
+/* {{{ proto public Elasticsearch::delete($index_type, $id) */
+PHP_METHOD(Elasticsearch, delete)
 {
 	zend_string *url_string, *index_type, *id;
 	char *data = "NULL";
@@ -366,11 +358,10 @@ ZEND_METHOD(ElasticSearch, delete)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
-/**
- * ES count method
- */
-ZEND_METHOD(ElasticSearch, count)
+/* {{{ proto public Elasticsearch::count($index_type, $data) */
+PHP_METHOD(Elasticsearch, count)
 {
 	zend_string *url_string, *index_type, *data;
 
@@ -387,19 +378,20 @@ ZEND_METHOD(ElasticSearch, count)
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
+/* }}} */
 
 zend_function_entry es_methods[] = {
-		PHP_ME(ElasticSearch, setEsConfig, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, getEsConfig, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, getHost, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, index, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, bulk, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, get, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, mget, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, search, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, update, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, delete, NULL, ZEND_ACC_PUBLIC)
-		PHP_ME(ElasticSearch, count, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, setEsConfig, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, getEsConfig, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, getHost, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, index, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, bulk, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, get, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, mget, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, search, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, update, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, delete, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, count, NULL, ZEND_ACC_PUBLIC)
 		PHP_FE_END
 };
 
@@ -417,7 +409,7 @@ PHP_MINIT_FUNCTION(elasticsearch)
 	zend_class_entry es;
 
 	// Initialize zend_class_entry.
-	INIT_CLASS_ENTRY(es, "ElasticSearch", es_methods);
+	INIT_CLASS_ENTRY(es, "Elasticsearch", es_methods);
 
 	// registered
 	es_class = zend_register_internal_class(&es);
@@ -484,7 +476,7 @@ PHP_MINFO_FUNCTION(elasticsearch)
  * Every user visible function must have an entry in elasticsearch_functions[].
  */
 const zend_function_entry elasticsearch_functions[] = {
-	PHP_FE(confirm_elasticsearch_compiled,	NULL)		/* For testing, remove later. */
+	//PHP_FE(confirm_elasticsearch_compiled,	NULL)		/* For testing, remove later. */
 	PHP_FE_END	/* Must be the last line in elasticsearch_functions[] */
 };
 /* }}} */
