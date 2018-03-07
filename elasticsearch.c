@@ -194,9 +194,7 @@ ZEND_METHOD(ElasticSearch, getEsConfig)
 	host = zend_read_property(es_class, getThis(), ZEND_STRL("_host"), 0, rh);
 	port = zend_read_property(es_class, getThis(), ZEND_STRL("_port"), 0, rp);
 
-	/* 将 zval 转成 zend_string 类型  */
 	host_string = zval_get_string(host);
-	/* 将 zval 转成 zend_long 类型  */
 	port_long = zval_get_long(port);
 
 	url = strpprintf(0, "%s:%d", ZSTR_VAL(host_string), port_long);
@@ -242,6 +240,27 @@ ZEND_METHOD(ElasticSearch, index)
 }
 
 /**
+ * ES bulk method (Batch create document)
+ */
+ZEND_METHOD(ElasticSearch, bulk)
+{
+	zend_string *url_string, *index_type, *data;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &data) == FAILURE) {
+		return;
+	}
+
+	/* Join the URL and send the curl request. */
+	url_string =  strpprintf(0, "%s/%s/_bulk",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+
+	curl_es("POST", ZSTR_VAL(url_string), ZSTR_VAL(data));
+
+	zend_string *strg;
+	strg = strpprintf(0, "%s", response_info.body);
+	RETURN_STR(strg);
+}
+
+/**
  * ES get method
  */
 ZEND_METHOD(ElasticSearch, get)
@@ -257,6 +276,27 @@ ZEND_METHOD(ElasticSearch, get)
 	url_string =  strpprintf(0, "%s/%s/%s",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type), ZSTR_VAL(id));
 
 	curl_es("GET", ZSTR_VAL(url_string), data);
+
+	zend_string *strg;
+	strg = strpprintf(0, "%s", response_info.body);
+	RETURN_STR(strg);
+}
+
+/**
+ * ES get method (Batch access document)
+ */
+ZEND_METHOD(ElasticSearch, mget)
+{
+	zend_string *url_string, *index_type, *data;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &data) == FAILURE) {
+		return;
+	}
+
+	/* Join the URL and send the curl request. */
+	url_string =  strpprintf(0, "%s/%s/_mget",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+
+	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
 
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
@@ -327,16 +367,39 @@ ZEND_METHOD(ElasticSearch, delete)
 	RETURN_STR(strg);
 }
 
+/**
+ * ES count method
+ */
+ZEND_METHOD(ElasticSearch, count)
+{
+	zend_string *url_string, *index_type, *data;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &data) == FAILURE) {
+		return;
+	}
+
+	/* Join the URL and send the curl request. */
+	url_string =  strpprintf(0, "%s/%s/_count",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+
+	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
+
+	zend_string *strg;
+	strg = strpprintf(0, "%s", response_info.body);
+	RETURN_STR(strg);
+}
 
 zend_function_entry es_methods[] = {
 		PHP_ME(ElasticSearch, setEsConfig, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(ElasticSearch, getEsConfig, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(ElasticSearch, getHost, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(ElasticSearch, index, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(ElasticSearch, bulk, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(ElasticSearch, get, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(ElasticSearch, mget, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(ElasticSearch, search, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(ElasticSearch, update, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(ElasticSearch, delete, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(ElasticSearch, count, NULL, ZEND_ACC_PUBLIC)
 		PHP_FE_END
 };
 
