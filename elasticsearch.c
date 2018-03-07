@@ -220,8 +220,24 @@ ZEND_METHOD(ElasticSearch, getHost)
  */
 ZEND_METHOD(ElasticSearch, index)
 {
+	zend_string *url_string, *index_type, *data, *id = NULL;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS|S", &index_type, &data, &id) == FAILURE) {
+		return;
+	}
+
+	if (!id) {
+		url_string =  strpprintf(0, "%s/%s",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+		curl_es("POST", ZSTR_VAL(url_string), ZSTR_VAL(data));
+	} else {
+		url_string =  strpprintf(0, "%s/%s/%s",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type), ZSTR_VAL(id));
+		curl_es("PUT", ZSTR_VAL(url_string), ZSTR_VAL(data));
+	}
+
+	printf("%s \r\n", ZSTR_VAL(url_string));
+
 	zend_string *strg;
-	strg = strpprintf(0, "ElasticSearch index method");
+	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
 

@@ -25,7 +25,7 @@ _**Description**_: Creates a ElasticSearch client
 $es = new ElasticSearch();
 ~~~
 
-### setEsConfig Methods
+### setEsConfig method
 -----
 _**Description**_: Set ElasticSearch host and port.
 
@@ -36,7 +36,20 @@ $es->setEsConfig("http://172.16.16.221", 9200);
 ~~~
 
 
-### get Methods
+
+### index method
+-----
+_**Description**_: index.
+
+##### *Example*
+
+~~~
+$id = "AVyqzrcLD0y03jdznsAG";
+$info = $es->index("user_index/user", $id);
+~~~
+
+
+### get method
 -----
 _**Description**_: get.
 
@@ -47,7 +60,7 @@ $id = "AVyqzrcLD0y03jdznsAG";
 $info = $es->get("user_index/user", $id);
 ~~~
 
-### search Methods
+### search method
 -----
 _**Description**_: search.
 
@@ -58,7 +71,7 @@ $data = "{\"query\": {\"match_all\": {}}, \"from\":0, \"size\":1}";
 $info = $es->search("user_index/user", $data);
 ~~~
 
-### update Methods
+### update method
 -----
 _**Description**_: update.
 
@@ -69,7 +82,7 @@ $update_data = "{\"doc\" : {\"custom_id\":60}}";
 $info = $es->update("user_index/user", $id, $update_data);
 ~~~
 
-### delete Methods
+### delete method
 -----
 _**Description**_: delete.
 
