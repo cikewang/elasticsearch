@@ -44,8 +44,15 @@ _**Description**_: index.
 ##### *Example*
 
 ~~~
+// Automatic generation _id
+$data = "{\"user_id\": 1,\"username\": "LiBo"}";
+$info = $es->index("user_index/user", $data);
+
+
+// Specify the _id
 $id = "AVyqzrcLD0y03jdznsAG";
-$info = $es->index("user_index/user", $id);
+$data = "{\"user_id\": 1,\"username\": "LiBo"}";
+$info = $es->index("user_index/user", $data, $id);
 ~~~
 
 
