@@ -3,7 +3,7 @@ Elasticsearch PHP extensions
 
 
 ## Requirement
-- PHP 7.1 +
+- PHP 5.4 +
 
 
 ## Install
