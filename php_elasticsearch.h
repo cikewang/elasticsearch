@@ -43,7 +43,7 @@ extern zend_module_entry elasticsearch_module_entry;
 	and END macros here:
 */
 ZEND_BEGIN_MODULE_GLOBALS(elasticsearch)
-	zend_long  global_port;
+	uint  global_port;
 	char *global_host;
 	char *global_url;
 ZEND_END_MODULE_GLOBALS(elasticsearch)
@@ -53,10 +53,10 @@ ZEND_END_MODULE_GLOBALS(elasticsearch)
    You are encouraged to rename these macros something shorter, see
    examples in any other php module directory.
 */
-#define ELASTICSEARCH_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(elasticsearch, v)
-
-#if defined(ZTS) && defined(COMPILE_DL_ELASTICSEARCH)
-ZEND_TSRMLS_CACHE_EXTERN()
+#ifdef ZTS
+#define ELASTICSEARCH_G(v) TSRMG(elasticsearch_globals_id, zend_elasticsearch_globals *, v)
+#else
+#define ELASTICSEARCH_G(v) (elasticsearch_globals.v)
 #endif
 
 #endif	/* PHP_ELASTICSEARCH_H */

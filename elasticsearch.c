@@ -33,7 +33,6 @@
 /* If you declare any globals in php_elasticsearch.h uncomment this:*/
 ZEND_DECLARE_MODULE_GLOBALS(elasticsearch)
 
-
 /* True global resources - no need for thread safety here */
 static int le_elasticsearch;
 
@@ -90,7 +89,7 @@ static void php_elasticsearch_init_globals(zend_elasticsearch_globals *elasticse
 
 struct ResponseStruct {
 	char *body;
-	size_t size;
+	uint size;
 } response_info;
 
 /** {{{ static size_t WriteResponseCallback(void *contents, size_t size, size_t nmemb, void *userp) */
@@ -164,8 +163,8 @@ zend_class_entry *es_class;
 /* {{{ proto public Elasticsearch::setEsConfig($host, $port) */
 PHP_METHOD(Elasticsearch, setEsConfig)
 {
-	zval *host;
-	zend_long *port;
+	zval *host, *url;
+	uint port, url_len;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z|l", &host, &port) == FAILURE) {
 		return;
@@ -174,209 +173,186 @@ PHP_METHOD(Elasticsearch, setEsConfig)
 	zend_update_property(es_class, getThis(), ZEND_STRL("_host"), host);
 	zend_update_property_long(es_class, getThis(), ZEND_STRL("_port"), port);
 
-	zend_string *_host = zval_get_string(host);
-	ELASTICSEARCH_G(global_host) = ZSTR_VAL(_host);
-	ELASTICSEARCH_G(global_port) = port;
+	url_len = spprintf(&url, 0 , "%s:%d", Z_STRVAL(*host), port);
 
-	zend_string *url;
-	url = strpprintf(0, "%s:%d", ZSTR_VAL(_host), port);
-	ELASTICSEARCH_G(global_url) = ZSTR_VAL(url);
+	ELASTICSEARCH_G(global_host) = Z_STRVAL(*host);
+	ELASTICSEARCH_G(global_port) = port;
+	ELASTICSEARCH_G(global_url) = url;
+
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::getEsConfig() */
 PHP_METHOD(Elasticsearch, getEsConfig)
 {
-	zval *host, *port, *rh, *rp;
-	zend_string *host_string, *url;
-	zend_long *port_long;
+	zval *host, *port;
+	char *url;
 
-	host = zend_read_property(es_class, getThis(), ZEND_STRL("_host"), 0, rh);
-	port = zend_read_property(es_class, getThis(), ZEND_STRL("_port"), 0, rp);
+	host = zend_read_property(es_class, getThis(), ZEND_STRL("_host"), 1 TSRMLS_CC);
+	port = zend_read_property(es_class, getThis(), ZEND_STRL("_port"), 1 TSRMLS_CC);
 
-	host_string = zval_get_string(host);
-	port_long = zval_get_long(port);
-
-	url = strpprintf(0, "%s:%d", ZSTR_VAL(host_string), port_long);
-	RETVAL_STR(url);
+	spprintf(&url, 0 , "%s:%d", Z_STRVAL(*host), Z_LVAL(*port));
+	RETURN_STRING(url, 0);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::getHost() */
 PHP_METHOD(Elasticsearch, getHost)
 {
-	zval *self = getThis();
-	zval *name;
-	zval *rv;
-	name = zend_read_property(Z_OBJCE_P(self), self, ZEND_STRL("_host"), 0, rv);
-	RETURN_STR(name->value.str);
+//	zval *self = getThis();
+//	zval *name;
+//	zval *rv;
+//	name = zend_read_property(Z_OBJCE_P(self), self, ZEND_STRL("_host"), 0, rv);
+//	RETURN_STR(name->value.str);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::index($index_type, $data, $id) */
 PHP_METHOD(Elasticsearch, index)
 {
-	zend_string *url_string, *index_type, *data, *id = NULL;
+	char *index_type, *data, *url, *id = NULL;
+	uint index_type_len, data_len, id_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS|S", &index_type, &data, &id) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss|s", &index_type, &index_type_len, &data, &data_len, &id, &id_len) == FAILURE) {
 		return;
 	}
 
 	if (!id) {
-		url_string =  strpprintf(0, "%s/%s",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
-		curl_es("POST", ZSTR_VAL(url_string), ZSTR_VAL(data));
+		spprintf(&url, 0 , "%s/%s", ELASTICSEARCH_G(global_url), index_type);
+		curl_es("POST", url, data);
 	} else {
-		url_string =  strpprintf(0, "%s/%s/%s",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type), ZSTR_VAL(id));
-		curl_es("PUT", ZSTR_VAL(url_string), ZSTR_VAL(data));
+		spprintf(&url, 0 , "%s/%s/%s", ELASTICSEARCH_G(global_url), index_type, id);
+		curl_es("PUT", url, data);
 	}
 
-	printf("%s \r\n", ZSTR_VAL(url_string));
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::bulk($index_type, $data) */
 PHP_METHOD(Elasticsearch, bulk)
 {
-	zend_string *url_string, *index_type, *data;
+	char *url, *index_type, *data;
+	uint url_len, index_type_len, data_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &data) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss", &index_type, &index_type_len, &data, &data_len) == FAILURE) {
 		return;
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/_bulk",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+	spprintf(&url, 0, "%s/%s/_bulk",ELASTICSEARCH_G(global_url), index_type);
+	curl_es("POST", url, data);
 
-	curl_es("POST", ZSTR_VAL(url_string), ZSTR_VAL(data));
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::get($index_type, $id) */
 PHP_METHOD(Elasticsearch, get)
 {
-	zend_string *url_string, *index_type, *id;
-	char *data = "NULL";
+	char *url, *index_type, *id, *data = "NULL";
+	uint index_type_len, id_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &id) == FAILURE) {
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss", &index_type, &index_type_len, &id, &id_len) == FAILURE) {
 		return;
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/%s",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type), ZSTR_VAL(id));
+	spprintf(&url, 0, "%s/%s/%s",ELASTICSEARCH_G(global_url), index_type, id);
+	curl_es("GET", url, data);
 
-	curl_es("GET", ZSTR_VAL(url_string), data);
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::mget($index_type, $data) */
 PHP_METHOD(Elasticsearch, mget)
 {
-	zend_string *url_string, *index_type, *data;
+	char *url, *index_type, *data;
+	uint index_type_len, data_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &data) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss", &index_type, &index_type_len, &data, &data_len) == FAILURE) {
 		return;
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/_mget",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+	spprintf(&url, 0, "%s/%s/_mget",ELASTICSEARCH_G(global_url), index_type);
+	curl_es("GET", url, data);
 
-	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::search($index_type, $data) */
 PHP_METHOD(Elasticsearch, search)
 {
-	zend_string *url_string, *index_type, *data;
+	char *url, *index_type, *data;
+	uint index_type_len, data_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &data) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss", &index_type, &index_type_len, &data, &data_len) == FAILURE) {
 		return;
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/_search",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+	spprintf(&url, 0, "%s/%s/_search",ELASTICSEARCH_G(global_url), index_type);
+	curl_es("GET", url, data);
 
-	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::update($index_type, $id, $data) */
 PHP_METHOD(Elasticsearch, update)
 {
-	zend_string *url_string, *index_type, *id, *data;
+	char *url, *index_type, *id, *data;
+	uint index_type_len, id_len, data_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SSS", &index_type, &id, &data) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "sss", &index_type, &index_type_len, &id, &id_len, &data, &data_len) == FAILURE) {
 		return;
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/%s/_update",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type), ZSTR_VAL(id));
+	spprintf(&url, 0, "%s/%s/_update",ELASTICSEARCH_G(global_url), index_type, id);
+	curl_es("POST", url, data);
 
-	curl_es("POST", ZSTR_VAL(url_string), ZSTR_VAL(data));
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::delete($index_type, $id) */
 PHP_METHOD(Elasticsearch, delete)
 {
-	zend_string *url_string, *index_type, *id;
-	char *data = "NULL";
+	char *url, *index_type, *id, *data = "NULL";
+	uint index_type_len, id_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &id) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss", &index_type, &index_type_len, &id, &id_len) == FAILURE) {
 		return;
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/%s",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type), ZSTR_VAL(id));
+	spprintf(&url, 0, "%s/%s/%s",ELASTICSEARCH_G(global_url), index_type, id);
+	curl_es("DELETE", url, data);
 
-	curl_es("DELETE", ZSTR_VAL(url_string), data);
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
 /* {{{ proto public Elasticsearch::count($index_type, $data) */
 PHP_METHOD(Elasticsearch, count)
 {
-	zend_string *url_string, *index_type, *data;
+	char *url, *index_type, *data;
+	uint index_type_len, data_len;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "SS", &index_type, &data) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss", &index_type, &index_type_len, &data, &data_len) == FAILURE) {
 		return;
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/_count",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+	spprintf(&url, 0, "%s/%s/_count",ELASTICSEARCH_G(global_url), index_type);
+	curl_es("GET", url, data);
 
-	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
-
-	zend_string *strg;
-	strg = strpprintf(0, "%s", response_info.body);
-	RETURN_STR(strg);
+	RETURN_STRING(response_info.body, 1);
 }
 /* }}} */
 
