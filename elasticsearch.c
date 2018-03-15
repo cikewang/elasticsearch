@@ -24,10 +24,12 @@
 
 #include "php.h"
 #include "php_ini.h"
-#include "ext/standard/info.h"
-#include <curl/curl.h>
-#include <string.h>
 
+#include <string.h>
+#include <curl/curl.h>
+#include "ext/standard/info.h"
+#include "ext/pcre/php_pcre.h"
+#include "ext/standard/php_string.h"
 #include "php_elasticsearch.h"
 
 /* If you declare any globals in php_elasticsearch.h uncomment this:*/
@@ -52,23 +54,73 @@ PHP_INI_END()
    purposes. */
 
 /* Every user-visible function in PHP should document itself in the source */
-/* {{{ proto string confirm_elasticsearch_compiled(string arg)
+/* {{{ proto string elasticsearch_test(int arg)
    Return a string to confirm that the module is compiled in
-PHP_FUNCTION(confirm_elasticsearch_compiled)
+ */
+PHP_FUNCTION(elasticsearch_test)
 {
-	char *arg = NULL;
-	size_t arg_len, len;
-	zend_string *strg;
+	zend_long number;
+	zval call_func_name, call_func_ret, call_func_params[1];
+	uint32_t call_func_param_cnt = 1;
+	zend_string *call_func_str;
+	char *func_name = "mySum";
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s", &arg, &arg_len) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "l", &number) == FAILURE) {
 		return;
 	}
+	// 分配 zend_string 调用完需要释放
+	call_func_str = zend_string_init(func_name, strlen(func_name), 0);
+	// 设置到 zval
+	ZVAL_STR(&call_func_name, call_func_str);
+	// 设置参数
+	ZVAL_LONG(&call_func_params[0], number);
+	// 调用
+	if (SUCCESS != call_user_function(EG(function_table), NULL, &call_func_name, &call_func_ret, call_func_param_cnt, call_func_params)) {
+		zend_string_release(call_func_str);
+		RETURN_FALSE;
+	}
 
-	strg = strpprintf(0, "Congratulations! You have successfully modified ext/%.78s/config.m4. Module %.78s is now compiled into PHP.", "elasticsearch", arg);
-
-	RETURN_STR(strg);
-}*/
+	zend_string_release(call_func_str);
+	RETURN_LONG(Z_LVAL(call_func_ret));
+}
 /* }}} */
+
+
+/* {{{ proto string elasticsearch_test(int arg)
+   Return a string to confirm that the module is compiled in
+ */
+PHP_FUNCTION(elasticsearch_merge)
+{
+	zend_array *arr1, *arr2;
+	zval call_func_name, call_func_ret, call_func_params[2];
+	uint32_t call_func_param_cnt = 2;
+	zend_string *call_func_str;
+	char *func_name = "array_merge";
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "hh", &arr1, &arr2) == FAILURE) {
+		RETURN_FALSE;
+	}
+
+	// 分配 zend_string
+	call_func_str = zend_string_init(func_name, strlen(func_name), 0);
+	// 设置到 zval
+	ZVAL_STR(&call_func_name, call_func_str);
+	ZVAL_ARR(&call_func_params[0], arr1);
+	ZVAL_ARR(&call_func_params[1], arr2);
+
+	if (SUCCESS != call_user_function(EG(function_table), NULL, &call_func_name, &call_func_ret, call_func_param_cnt, call_func_params)) {
+		zend_string_release(call_func_str);
+		RETURN_FALSE;
+	}
+
+	zend_string_release(call_func_str);
+	RETURN_ARR(Z_ARRVAL(call_func_ret));
+
+
+}
+/* }}} */
+
+
 /* The previous line is meant for vim and emacs, so it can correctly fold and
    unfold functions in source code. See the corresponding marks just before
    function definition, where the functions purpose is also documented. Please
@@ -165,7 +217,7 @@ zend_class_entry *es_class;
 PHP_METHOD(Elasticsearch, setEsConfig)
 {
 	zval *host;
-	zend_long *port;
+	zend_long port;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z|l", &host, &port) == FAILURE) {
 		return;
@@ -289,7 +341,7 @@ PHP_METHOD(Elasticsearch, mget)
 	}
 
 	/* Join the URL and send the curl request. */
-	url_string =  strpprintf(0, "%s/%s/_mget",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
+	url_string =  strpprintf(0, "%s/%s/_mget", ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
 
 	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
 
@@ -380,6 +432,65 @@ PHP_METHOD(Elasticsearch, count)
 }
 /* }}} */
 
+/* {{{ proto public Elasticsearch::count($index_type, $data) */
+PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
+{
+	zend_string *where, *lower_where;
+	zend_string *delimiter_str;
+	zend_long limit = ZEND_LONG_MAX;
+	char *delimiter = "and";
+
+	// FOREACH 变量
+	zend_string *string_key;
+	zend_long num_key;
+	zval *entry;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "S", &where) == FAILURE) {
+		RETURN_FALSE;
+	}
+
+	// 转成小写
+	lower_where = php_string_tolower(where);
+	// 初始化 delimiter_str
+	delimiter_str = zend_string_init(delimiter, strlen(delimiter), 0);
+	// 字符串截断为数组
+	array_init(return_value);
+	php_explode(delimiter_str, lower_where, return_value, limit);
+
+
+	// 正则匹配
+	zval *replace_str_zval;
+	char *regex = "/\\s+/";
+	zend_string *regex_str = zend_string_init(regex, strlen(regex), 0);
+	char *replace = " ";
+	int replace_len = strlen(replace);
+	zend_string *replace_str = zend_string_init(replace, strlen(replace), 0);
+	ZVAL_STR(replace_str_zval, replace_str);
+	int pcre_replace_limit = -1;
+	int replace_count = 0;
+
+	ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(return_value), num_key, string_key, entry) {
+
+//		printf("%d \r\n", num_key);
+//		printf("%s \r\n",  Z_STRVAL_P(entry));
+		//去除字符串首尾处的空白字符
+//		printf("%s \r\n",  ZSTR_VAL(php_trim(zval_get_string(entry), NULL, 0, 3)));
+
+		zend_string *subject_str = php_trim(zval_get_string(entry), NULL, 0, 3);
+		printf("%s \r\n", ZSTR_VAL(regex_str));
+		printf("%s \r\n", ZSTR_VAL(subject_str));
+		printf("%s \r\n", ZSTR_VAL(replace_str));
+
+
+		zend_string *rep_value = php_pcre_replace(regex_str, subject_str, ZSTR_VAL(subject_str), ZSTR_LEN(subject_str), replace_str_zval, 0, pcre_replace_limit, replace_count);
+//		printf("%s \r\n", ZSTR_VAL(replace_str));
+
+	}ZEND_HASH_FOREACH_END();
+
+	RETURN_ARR(Z_ARRVAL_P(return_value));
+}
+/* }}} */
+
 zend_function_entry es_methods[] = {
 		PHP_ME(Elasticsearch, setEsConfig, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(Elasticsearch, getEsConfig, NULL, ZEND_ACC_PUBLIC)
@@ -392,6 +503,7 @@ zend_function_entry es_methods[] = {
 		PHP_ME(Elasticsearch, update, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(Elasticsearch, delete, NULL, ZEND_ACC_PUBLIC)
 		PHP_ME(Elasticsearch, count, NULL, ZEND_ACC_PUBLIC)
+		PHP_ME(Elasticsearch, setQueryConvertESFormat, NULL, ZEND_ACC_PUBLIC)
 		PHP_FE_END
 };
 
@@ -476,7 +588,8 @@ PHP_MINFO_FUNCTION(elasticsearch)
  * Every user visible function must have an entry in elasticsearch_functions[].
  */
 const zend_function_entry elasticsearch_functions[] = {
-	//PHP_FE(confirm_elasticsearch_compiled,	NULL)		/* For testing, remove later. */
+	PHP_FE(elasticsearch_test,	NULL)		/* For testing, remove later. */
+	PHP_FE(elasticsearch_merge, NULL)
 	PHP_FE_END	/* Must be the last line in elasticsearch_functions[] */
 };
 /* }}} */
