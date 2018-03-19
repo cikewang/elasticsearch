@@ -435,9 +435,19 @@ PHP_METHOD(Elasticsearch, count)
 /* {{{ proto public Elasticsearch::count($index_type, $data) */
 PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 {
-	zend_string *where, *lower_where;
+	zend_string *where, *order_by, *group_by, *limit;
+	zend_long *return_format;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "S|SSS", &where, &order_by, &group_by, &limit) == FAILURE) {
+		RETURN_FALSE;
+	}
+
+	// 转小写变量
+	zend_string *lower_where;
+
+	// 字符串分割为数组 变量
 	zend_string *delimiter_str;
-	zend_long limit = ZEND_LONG_MAX;
+	zend_long explode_limit = ZEND_LONG_MAX;
 	char *delimiter = "and";
 
 	// FOREACH 变量
@@ -445,51 +455,210 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 	zend_long num_key;
 	zval *entry;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "S", &where) == FAILURE) {
-		RETURN_FALSE;
-	}
-
 	// 转成小写
 	lower_where = php_string_tolower(where);
 	// 初始化 delimiter_str
 	delimiter_str = zend_string_init(delimiter, strlen(delimiter), 0);
 	// 字符串截断为数组
 	array_init(return_value);
-	php_explode(delimiter_str, lower_where, return_value, limit);
+	php_explode(delimiter_str, lower_where, return_value, explode_limit);
 
-
-	// 正则匹配
-	zval *replace_str_zval;
-	char *regex = "/\\s+/";
-	zend_string *regex_str = zend_string_init(regex, strlen(regex), 0);
+	// 正则替换 变量定义
+	zval replace_str_zval;
+	char *repl_regex = "/\\s+/";
+	zend_string *repl_regex_str = zend_string_init(repl_regex, strlen(repl_regex), 0);
 	char *replace = " ";
 	int replace_len = strlen(replace);
 	zend_string *replace_str = zend_string_init(replace, strlen(replace), 0);
-	ZVAL_STR(replace_str_zval, replace_str);
-	int pcre_replace_limit = -1;
+	ZVAL_STR(&replace_str_zval, replace_str);
+	int replace_limit = -1;
 	int replace_count = 0;
 
+	// 正则匹配  变量定义
+	zval subpats;
+	zval match_return_value;
+	char *match_regex = "/(\\S*)\\s?([in|not in|>|>=|<|<=|!=]+)\\s?\\(?([\\S\\s]*)\\)?/";
+	zend_string		 *match_regex_str = zend_string_init(match_regex, strlen(match_regex), 0);			/* Regular expression */
+	zend_string		 *rep_value;		/* String to match against */
+	pcre_cache_entry *pce;				/* Compiled regular expression */
+	zend_long		 flags = 0;		/* Match control flags */
+	zend_long		 start_offset = 0;	/* Where the new search starts */
+
+	// 数组
+	zend_string *key_str, *condition_str, *value_str;
+	zval *key_zval, *condition_zval, *value_zval;
+	char *key_char, *condition, *value_char;
+	char *equal_symbol = "=", *not_equal_symbol = "!=";
+	char *in_symbol = "in", *not_in_symbol = "not in";
+	char *great_than_symbol = ">", *great_than_or_equal_symbol = ">=";
+	char *less_than_symbol = "<", *less_than_or_equal_symbol = "<=";
+	char *great_than = "gt", *great_than_or_equal = "gte";
+	char *less_than = "lt", *less_than_or_equal = "lte";
+
+	// 初始化
+	zval es_arr, bool_arr, must_arr, must_not_arr, bool_where;
+	array_init(&es_arr);
+	array_init(&bool_where);
+	array_init(&must_arr);
+	array_init(&must_not_arr);
+	array_init(&bool_arr);
+
+	char *match_char_key = "match";
+	char *must_arr_key = "must";
+	char *must_not_arr_key = "must_not";
+	char *bool_char_key = "bool";
+	char *query_char_key = "query";
+	char *range_char_key = "range";
+	char *should_char_key = "should";
+
+	zval not_equal_arr;
+	zval great_than_arr, great_than_or_equal_arr;
+	zval less_than_arr, less_than_or_equal_arr;
+
+	array_init(&not_equal_arr);
+	array_init(&great_than_arr);
+	array_init(&great_than_or_equal_arr);
+	array_init(&less_than_arr);
+	array_init(&less_than_or_equal_arr);
+
+	// in FOREACH
+	char *common = ",";
+	zend_string *common_str = zend_string_init(common, strlen(common), 0);
+
 	ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(return_value), num_key, string_key, entry) {
+		zval fields_arr, tmp_arr, range_arr;
+		array_init(&fields_arr);
+		array_init(&tmp_arr);
+		array_init(&range_arr);
 
-//		printf("%d \r\n", num_key);
-//		printf("%s \r\n",  Z_STRVAL_P(entry));
-		//去除字符串首尾处的空白字符
-//		printf("%s \r\n",  ZSTR_VAL(php_trim(zval_get_string(entry), NULL, 0, 3)));
-
+		// 删除字符串两边空字符
 		zend_string *subject_str = php_trim(zval_get_string(entry), NULL, 0, 3);
-		printf("%s \r\n", ZSTR_VAL(regex_str));
-		printf("%s \r\n", ZSTR_VAL(subject_str));
-		printf("%s \r\n", ZSTR_VAL(replace_str));
+		// 正则替换
+		rep_value = php_pcre_replace(repl_regex_str, subject_str, ZSTR_VAL(subject_str), ZSTR_LEN(subject_str), &replace_str_zval, 0, replace_limit, &replace_count);
+		// 删除右括号
+		zend_string *match_subject_str = php_trim(rep_value, ")", 1, 3);
 
+		// 正则匹配
+		if ((pce = pcre_get_compiled_regex_cache(match_regex_str)) == NULL) {
+			RETURN_FALSE;
+		}
 
-		zend_string *rep_value = php_pcre_replace(regex_str, subject_str, ZSTR_VAL(subject_str), ZSTR_LEN(subject_str), replace_str_zval, 0, pcre_replace_limit, replace_count);
-//		printf("%s \r\n", ZSTR_VAL(replace_str));
+		php_pcre_match_impl(pce, ZSTR_VAL(match_subject_str), ZSTR_LEN(match_subject_str), &match_return_value, &subpats, 0, 0, 0, 0);
+
+		// 从数组中获取值
+		key_str = php_trim(zval_get_string(zend_hash_index_find(Z_ARRVAL(subpats), 1)), NULL, 0, 3);
+		key_char = ZSTR_VAL(key_str);
+		condition_str = php_trim(zval_get_string(zend_hash_index_find(Z_ARRVAL(subpats), 2)), NULL, 0, 3);
+		condition = ZSTR_VAL(condition_str);
+		value_zval = zend_hash_index_find(Z_ARRVAL(subpats), 3);
+		value_str = php_trim(zval_get_string(value_zval), NULL, 0, 3);
+		value_char = ZSTR_VAL(value_str);
+
+		// 获取数组指定 index
+		if (strcmp(condition, equal_symbol) == 0) {
+			zend_hash_update(Z_ARRVAL(fields_arr), key_str, value_zval);
+			zend_hash_str_update(Z_ARRVAL(tmp_arr), match_char_key, strlen(match_char_key), &fields_arr);
+			zend_hash_next_index_insert(Z_ARRVAL(bool_where), &tmp_arr);
+
+		} else if (strcmp(condition, not_equal_symbol) == 0) {
+			zend_hash_update(Z_ARRVAL(fields_arr), key_str, value_zval);
+			zend_hash_str_update(Z_ARRVAL(tmp_arr), match_char_key, strlen(match_char_key), &fields_arr);
+			zend_hash_next_index_insert(Z_ARRVAL(not_equal_arr), &tmp_arr);
+
+		} else if (strcmp(condition, in_symbol) == 0) {
+			zval in_explode_arr, in_arr, should_arr, in_bool_arr;
+			array_init(&in_explode_arr);
+			array_init(&in_arr);
+			array_init(&should_arr);
+			array_init(&in_bool_arr);
+
+			zend_string *in_string_key;
+			zend_long in_num_key;
+			zval *in_entry;
+
+			php_explode(common_str, zval_get_string(value_zval), &in_explode_arr, explode_limit);
+
+			ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL(in_explode_arr), in_num_key, in_string_key, in_entry) {
+				zval in_fields_arr, in_tmp_arr;
+				array_init(&in_fields_arr);
+				array_init(&in_tmp_arr);
+
+				// 删除空格
+				zval in_value_zval;
+				zend_string *in_value_str = php_trim(zval_get_string(in_entry), NULL, 1, 3);
+				ZVAL_STR(&in_value_zval, in_value_str);
+
+				zend_hash_update(Z_ARRVAL(in_fields_arr), key_str, &in_value_zval);
+				zend_hash_str_update(Z_ARRVAL(in_tmp_arr), match_char_key, strlen(match_char_key), &in_fields_arr);
+				zend_hash_next_index_insert(Z_ARRVAL(in_arr), &in_tmp_arr);
+			}ZEND_HASH_FOREACH_END();
+
+			// should arr
+			if (0 < zend_hash_num_elements(Z_ARRVAL(in_arr))) {
+				zend_hash_str_update(Z_ARRVAL(should_arr), should_char_key, strlen(should_char_key), &in_arr);
+			}
+
+			// bool arr
+			if (0 < zend_hash_num_elements(Z_ARRVAL(should_arr))) {
+				zend_hash_str_update(Z_ARRVAL(in_bool_arr), bool_char_key, strlen(bool_char_key), &should_arr);
+				zend_hash_next_index_insert(Z_ARRVAL(bool_where), &in_bool_arr);
+			}
+
+		} else if (strcmp(condition, not_in_symbol) == 0) {
+			printf("not_in_symbol \r\n");
+
+		} else if (strcmp(condition, great_than_symbol) == 0) {
+			zend_hash_str_add(Z_ARRVAL(great_than_arr), great_than, strlen(great_than), value_zval);
+			zend_hash_update(Z_ARRVAL(tmp_arr), key_str, &great_than_arr);
+			zend_hash_str_update(Z_ARRVAL(range_arr), range_char_key, strlen(range_char_key), &tmp_arr);
+			zend_hash_next_index_insert(Z_ARRVAL(bool_where), &range_arr);
+
+		} else if (strcmp(condition, great_than_or_equal_symbol) == 0) {
+			zend_hash_str_update(Z_ARRVAL(great_than_or_equal_arr), great_than_or_equal, strlen(great_than_or_equal), value_zval);
+			zend_hash_update(Z_ARRVAL(tmp_arr), key_str, &great_than_or_equal_arr);
+			zend_hash_str_update(Z_ARRVAL(range_arr), range_char_key, strlen(range_char_key), &tmp_arr);
+			zend_hash_next_index_insert(Z_ARRVAL(bool_where), &range_arr);
+
+		} else if (strcmp(condition, less_than_symbol) == 0) {
+			zend_hash_str_update(Z_ARRVAL(less_than_arr), less_than, strlen(less_than), value_zval);
+			zend_hash_update(Z_ARRVAL(tmp_arr), key_str, &less_than_arr);
+			zend_hash_str_update(Z_ARRVAL(range_arr), range_char_key, strlen(range_char_key), &tmp_arr);
+			zend_hash_next_index_insert(Z_ARRVAL(bool_where), &range_arr);
+
+		} else if (strcmp(condition, less_than_or_equal_symbol) == 0) {
+			zend_hash_str_update(Z_ARRVAL(less_than_or_equal_arr), less_than_or_equal, strlen(less_than_or_equal), value_zval);
+			zend_hash_update(Z_ARRVAL(tmp_arr), key_str, &less_than_or_equal_arr);
+			zend_hash_str_update(Z_ARRVAL(range_arr), range_char_key, strlen(range_char_key), &tmp_arr);
+			zend_hash_next_index_insert(Z_ARRVAL(bool_where), &range_arr);
+		}
 
 	}ZEND_HASH_FOREACH_END();
 
-	RETURN_ARR(Z_ARRVAL_P(return_value));
+	if (0 < zend_hash_num_elements(Z_ARRVAL(bool_where))) {
+		zend_hash_str_update(Z_ARRVAL(must_arr), must_arr_key, strlen(must_arr_key), &bool_where);
+	}
+
+	if (0 < zend_hash_num_elements(Z_ARRVAL(not_equal_arr))) {
+		zend_hash_str_update(Z_ARRVAL(must_not_arr), must_not_arr_key, strlen(must_not_arr_key), &not_equal_arr);
+	}
+
+	if (0 < zend_hash_num_elements(Z_ARRVAL(must_arr)) || 0 < zend_hash_num_elements(Z_ARRVAL(must_not_arr))) {
+		zend_hash_merge(Z_ARRVAL(must_arr), Z_ARRVAL(must_not_arr), NULL, 0);
+	}
+
+	if (0 < zend_hash_num_elements(Z_ARRVAL(must_arr))) {
+		zend_hash_str_update_ind(Z_ARRVAL(bool_arr), bool_char_key, strlen(bool_char_key), &must_arr);
+	}
+
+	if (0 < zend_hash_num_elements(Z_ARRVAL(bool_arr))) {
+		zend_hash_str_update(Z_ARRVAL(es_arr), query_char_key, strlen(query_char_key), &bool_arr);
+	}
+
+	RETURN_ARR(Z_ARRVAL(es_arr));
+
 }
 /* }}} */
+
 
 zend_function_entry es_methods[] = {
 		PHP_ME(Elasticsearch, setEsConfig, NULL, ZEND_ACC_PUBLIC)
