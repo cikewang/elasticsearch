@@ -585,7 +585,9 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 
 				// 删除空格
 				zval in_value_zval;
-				zend_string *in_value_str = php_trim(zval_get_string(in_entry), NULL, 1, 3);
+				zend_string *in_value_empty_str = php_trim(zval_get_string(in_entry), NULL, 0, 3);
+				zend_string *in_value_single_quotes_str = php_trim(in_value_empty_str, "'", 1, 3);
+				zend_string *in_value_str = php_trim(in_value_single_quotes_str, "\"", 1, 3);
 				ZVAL_STR(&in_value_zval, in_value_str);
 
 				zend_hash_update(Z_ARRVAL(in_fields_arr), key_str, &in_value_zval);

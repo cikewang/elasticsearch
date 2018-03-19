@@ -132,3 +132,18 @@ $data = ... ;  // ES JSON FORMAT
 $info = $es->count("your_index/your_type", $data);
 ~~~
 
+### setQueryConvertESFormat method
+-----
+_**Description**_: setQueryConvertESFormat.
+
+##### *Example*
+
+~~~
+$where = "user_name = 'abc' and password='xxxxx' "; 
+$where = "user_id in (1,2,3,4,5)";
+
+support : =、 !=、 >、 >=、 <、 <=、 in;
+
+$es_format_arr = $es->setQueryConvertESFormat($where);
+
+~~~
