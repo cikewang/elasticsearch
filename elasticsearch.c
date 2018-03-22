@@ -282,8 +282,6 @@ PHP_METHOD(Elasticsearch, index)
 		curl_es("PUT", ZSTR_VAL(url_string), ZSTR_VAL(data));
 	}
 
-	printf("%s \r\n", ZSTR_VAL(url_string));
-
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
@@ -435,7 +433,7 @@ PHP_METHOD(Elasticsearch, count)
 /* {{{ proto public Elasticsearch::count($index_type, $data) */
 PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 {
-	zend_string *where, *order_by, *group_by, *limit;
+	zend_string *where, *order_by = NULL, *group_by = NULL, *limit = NULL;
 	zend_long *return_format;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "S|SSS", &where, &order_by, &group_by, &limit) == FAILURE) {
@@ -467,10 +465,9 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 	zval replace_str_zval;
 	char *repl_regex = "/\\s+/";
 	zend_string *repl_regex_str = zend_string_init(repl_regex, strlen(repl_regex), 0);
-	char *replace = " ";
-	int replace_len = strlen(replace);
-	zend_string *replace_str = zend_string_init(replace, strlen(replace), 0);
-	ZVAL_STR(&replace_str_zval, replace_str);
+	char *space = " ";
+	zend_string *space_str = zend_string_init(space, strlen(space), 0);
+	ZVAL_STR(&replace_str_zval, space_str);
 	int replace_limit = -1;
 	int replace_count = 0;
 
@@ -522,8 +519,8 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 	array_init(&less_than_or_equal_arr);
 
 	// in FOREACH
-	char *common = ",";
-	zend_string *common_str = zend_string_init(common, strlen(common), 0);
+	char *comma = ",";
+	zend_string *comma_str = zend_string_init(comma, strlen(comma), 0);
 
 	ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(return_value), num_key, string_key, entry) {
 		zval fields_arr, tmp_arr, range_arr;
@@ -576,7 +573,7 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 			zend_long in_num_key;
 			zval *in_entry;
 
-			php_explode(common_str, zval_get_string(value_zval), &in_explode_arr, explode_limit);
+			php_explode(comma_str, zval_get_string(value_zval), &in_explode_arr, explode_limit);
 
 			ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL(in_explode_arr), in_num_key, in_string_key, in_entry) {
 				zval in_fields_arr, in_tmp_arr;
@@ -654,6 +651,64 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 
 	if (0 < zend_hash_num_elements(Z_ARRVAL(bool_arr))) {
 		zend_hash_str_update(Z_ARRVAL(es_arr), query_char_key, strlen(query_char_key), &bool_arr);
+	}
+
+	// order by
+	if (order_by) {
+		zend_string *subject_str = php_trim(order_by, NULL, 0, 3);
+		rep_value = php_pcre_replace(repl_regex_str, subject_str, ZSTR_VAL(subject_str), ZSTR_LEN(subject_str), &replace_str_zval, 0, replace_limit, &replace_count);
+
+		char *sort_char_key = "sort";
+		zend_string *order_by_string_key;
+		zend_long order_by_num_key;
+		zval *order_by_entry;
+		zval order_by_arr, sort_arr;
+		array_init(&order_by_arr);
+		array_init(&sort_arr);
+
+		char *order_fields_char = "order";
+		php_explode(comma_str, rep_value, &order_by_arr, explode_limit);
+
+		ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL(order_by_arr), order_by_num_key, order_by_string_key, order_by_entry) {
+			zval order_by_info_arr, order_fields_arr, fields_arr;
+			array_init(&order_by_info_arr);
+			array_init(&order_fields_arr);
+			array_init(&fields_arr);
+
+			zend_string *order_by_str = php_trim(zval_get_string(order_by_entry), NULL, 0, 3);
+			php_explode(space_str, order_by_str, &order_by_info_arr, explode_limit);
+
+			key_str = php_trim(zval_get_string(zend_hash_index_find(Z_ARRVAL(order_by_info_arr), 0)), NULL, 0, 3);
+			value_zval = zend_hash_index_find(Z_ARRVAL(order_by_info_arr), 1);
+
+			zend_hash_str_update(Z_ARRVAL(order_fields_arr), order_fields_char, strlen(order_fields_char), value_zval);
+			zend_hash_update(Z_ARRVAL(fields_arr), key_str, &order_fields_arr);
+			zend_hash_next_index_insert(Z_ARRVAL(sort_arr), &fields_arr);
+
+		} ZEND_HASH_FOREACH_END();
+
+		if (0 < zend_hash_num_elements(Z_ARRVAL(sort_arr)) ) {
+			zend_hash_str_update(Z_ARRVAL(es_arr), sort_char_key, strlen(sort_char_key), &sort_arr);
+		}
+	}
+
+
+	// limit
+	if (limit) {
+		char *from_char = "from";
+		char *size_char = "size";
+		zval limit_arr;
+		array_init(&limit_arr);
+		zval *from_zval, *size_zval;
+
+		zend_string *subject_str = php_trim(limit, NULL, 0, 3);
+		php_explode(comma_str, subject_str, &limit_arr, explode_limit);
+
+		from_zval = zend_hash_index_find(Z_ARRVAL(limit_arr), 0);
+		size_zval = zend_hash_index_find(Z_ARRVAL(limit_arr), 1);
+
+		zend_hash_str_update(Z_ARRVAL(es_arr), from_char, strlen(from_char), from_zval);
+		zend_hash_str_update(Z_ARRVAL(es_arr), size_char, strlen(size_char), size_zval);
 	}
 
 	RETURN_ARR(Z_ARRVAL(es_arr));
