@@ -139,11 +139,81 @@ _**Description**_: setQueryConvertESFormat.
 ##### *Example*
 
 ~~~
-$where = "user_name = 'abc' and password='xxxxx' "; 
-$where = "user_id in (1,2,3,4,5)";
+where = "user_id in (164, 800010264)";  # support : =、 !=、 >、 >=、 <、 <=、 in; 
+$order_by = "user_id DESC"; OR $order_by = "user_id DESC, user_name ASC";
+$group_by = "";  						#Temporary dissupport
+$limit = "0, 10"; 
+$es_format_arr = $es->setQueryConvertESFormat($where, $order_by, $group_by, $limit);
 
-support : =、 !=、 >、 >=、 <、 <=、 in;
+print_r($es_format_arr);
+Array
+(
+    [query] => Array
+        (
+            [bool] => Array
+                (
+                    [must] => Array
+                        (
+                            [0] => Array
+                                (
+                                    [bool] => Array
+                                        (
+                                            [should] => Array
+                                                (
+                                                    [0] => Array
+                                                        (
+                                                            [match] => Array
+                                                                (
+                                                                    [user_id] => 164
+                                                                )
 
-$es_format_arr = $es->setQueryConvertESFormat($where);
+                                                        )
+
+                                                    [1] => Array
+                                                        (
+                                                            [match] => Array
+                                                                (
+                                                                    [user_id] => 800010264
+                                                                )
+
+                                                        )
+
+                                                )
+
+                                        )
+
+                                )
+
+                        )
+
+                )
+
+        )
+
+    [sort] => Array
+        (
+            [0] => Array
+                (
+                    [user_id] => Array
+                        (
+                            [order] => DESC
+                        )
+
+                )
+
+            [1] => Array
+                (
+                    [aa] => Array
+                        (
+                            [order] => desc
+                        )
+
+                )
+
+        )
+
+    [from] => 1
+    [size] => 2
+)
 
 ~~~
