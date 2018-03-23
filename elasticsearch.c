@@ -586,7 +586,7 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 	}
 
 	// order by
-	if (order_by) {
+	if (0 < ZSTR_LEN(order_by)) {
 		zend_string *subject_str = php_trim(order_by, NULL, 0, 3);
 		rep_value = php_pcre_replace(repl_regex_str, subject_str, ZSTR_VAL(subject_str), ZSTR_LEN(subject_str), &replace_str_zval, 0, replace_limit, &replace_count);
 
@@ -626,7 +626,7 @@ PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 
 
 	// limit
-	if (limit) {
+	if (0 < ZSTR_LEN(limit)) {
 		char *from_char = "from";
 		char *size_char = "size";
 		zval limit_arr;
