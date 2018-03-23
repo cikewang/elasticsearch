@@ -53,74 +53,6 @@ PHP_INI_END()
    so that your module can be compiled into PHP, it exists only for testing
    purposes. */
 
-/* Every user-visible function in PHP should document itself in the source */
-/* {{{ proto string elasticsearch_test(int arg)
-   Return a string to confirm that the module is compiled in
- */
-PHP_FUNCTION(elasticsearch_test)
-{
-	zend_long number;
-	zval call_func_name, call_func_ret, call_func_params[1];
-	uint32_t call_func_param_cnt = 1;
-	zend_string *call_func_str;
-	char *func_name = "mySum";
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "l", &number) == FAILURE) {
-		return;
-	}
-	// 分配 zend_string 调用完需要释放
-	call_func_str = zend_string_init(func_name, strlen(func_name), 0);
-	// 设置到 zval
-	ZVAL_STR(&call_func_name, call_func_str);
-	// 设置参数
-	ZVAL_LONG(&call_func_params[0], number);
-	// 调用
-	if (SUCCESS != call_user_function(EG(function_table), NULL, &call_func_name, &call_func_ret, call_func_param_cnt, call_func_params)) {
-		zend_string_release(call_func_str);
-		RETURN_FALSE;
-	}
-
-	zend_string_release(call_func_str);
-	RETURN_LONG(Z_LVAL(call_func_ret));
-}
-/* }}} */
-
-
-/* {{{ proto string elasticsearch_test(int arg)
-   Return a string to confirm that the module is compiled in
- */
-PHP_FUNCTION(elasticsearch_merge)
-{
-	zend_array *arr1, *arr2;
-	zval call_func_name, call_func_ret, call_func_params[2];
-	uint32_t call_func_param_cnt = 2;
-	zend_string *call_func_str;
-	char *func_name = "array_merge";
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "hh", &arr1, &arr2) == FAILURE) {
-		RETURN_FALSE;
-	}
-
-	// 分配 zend_string
-	call_func_str = zend_string_init(func_name, strlen(func_name), 0);
-	// 设置到 zval
-	ZVAL_STR(&call_func_name, call_func_str);
-	ZVAL_ARR(&call_func_params[0], arr1);
-	ZVAL_ARR(&call_func_params[1], arr2);
-
-	if (SUCCESS != call_user_function(EG(function_table), NULL, &call_func_name, &call_func_ret, call_func_param_cnt, call_func_params)) {
-		zend_string_release(call_func_str);
-		RETURN_FALSE;
-	}
-
-	zend_string_release(call_func_str);
-	RETURN_ARR(Z_ARRVAL(call_func_ret));
-
-
-}
-/* }}} */
-
-
 /* The previous line is meant for vim and emacs, so it can correctly fold and
    unfold functions in source code. See the corresponding marks just before
    function definition, where the functions purpose is also documented. Please
@@ -814,8 +746,6 @@ PHP_MINFO_FUNCTION(elasticsearch)
  * Every user visible function must have an entry in elasticsearch_functions[].
  */
 const zend_function_entry elasticsearch_functions[] = {
-	PHP_FE(elasticsearch_test,	NULL)		/* For testing, remove later. */
-	PHP_FE(elasticsearch_merge, NULL)
 	PHP_FE_END	/* Must be the last line in elasticsearch_functions[] */
 };
 /* }}} */
