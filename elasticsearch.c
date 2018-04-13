@@ -181,6 +181,7 @@ PHP_METHOD(Elasticsearch, getEsConfig)
 	host_string = zval_get_string(host);
 	port_long = zval_get_long(port);
 
+	zend_string_release(host_string);
 	url = strpprintf(0, "%s:%d", ZSTR_VAL(host_string), port_long);
 	RETVAL_STR(url);
 }
@@ -214,6 +215,8 @@ PHP_METHOD(Elasticsearch, index)
 		curl_es("PUT", ZSTR_VAL(url_string), ZSTR_VAL(data));
 	}
 
+	zend_string_release(url_string);
+
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
@@ -233,6 +236,10 @@ PHP_METHOD(Elasticsearch, bulk)
 	url_string =  strpprintf(0, "%s/%s/_bulk",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
 
 	curl_es("POST", ZSTR_VAL(url_string), ZSTR_VAL(data));
+
+	zend_string_release(url_string);
+	zend_string_release(index_type);
+	zend_string_release(data);
 
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
@@ -255,6 +262,8 @@ PHP_METHOD(Elasticsearch, get)
 
 	curl_es("GET", ZSTR_VAL(url_string), data);
 
+	zend_string_release(url_string);
+
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
@@ -274,6 +283,9 @@ PHP_METHOD(Elasticsearch, mget)
 	url_string =  strpprintf(0, "%s/%s/_mget", ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type));
 
 	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
+
+	zend_string_release(url_string);
+	zend_string_release(data);
 
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
@@ -295,6 +307,10 @@ PHP_METHOD(Elasticsearch, search)
 
 	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
 
+	zend_string_release(url_string);
+	zend_string_release(index_type);
+	zend_string_release(data);
+
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
@@ -314,6 +330,9 @@ PHP_METHOD(Elasticsearch, update)
 	url_string =  strpprintf(0, "%s/%s/%s/_update",ELASTICSEARCH_G(global_url), ZSTR_VAL(index_type), ZSTR_VAL(id));
 
 	curl_es("POST", ZSTR_VAL(url_string), ZSTR_VAL(data));
+
+	zend_string_release(url_string);
+	zend_string_release(data);
 
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
@@ -336,6 +355,10 @@ PHP_METHOD(Elasticsearch, delete)
 
 	curl_es("DELETE", ZSTR_VAL(url_string), data);
 
+	zend_string_release(url_string);
+	zend_string_release(data);
+	zend_string_release(id);
+
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
@@ -356,13 +379,17 @@ PHP_METHOD(Elasticsearch, count)
 
 	curl_es("GET", ZSTR_VAL(url_string), ZSTR_VAL(data));
 
+	zend_string_release(url_string);
+	zend_string_release(index_type);
+	zend_string_release(data);
+
 	zend_string *strg;
 	strg = strpprintf(0, "%s", response_info.body);
 	RETURN_STR(strg);
 }
 /* }}} */
 
-/* {{{ proto public Elasticsearch::count($index_type, $data) */
+/* {{{ proto public Elasticsearch::setQueryConvertESFormat($where, $order_by, $group_by, $limit) */
 PHP_METHOD(Elasticsearch, setQueryConvertESFormat)
 {
 	zend_string *where, *order_by = NULL, *group_by = NULL, *limit = NULL;
