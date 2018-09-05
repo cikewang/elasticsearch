@@ -24,7 +24,7 @@
 extern zend_module_entry elasticsearch_module_entry;
 #define phpext_elasticsearch_ptr &elasticsearch_module_entry
 
-#define PHP_ELASTICSEARCH_VERSION "0.1.0" /* Replace with version number for your extension */
+#define PHP_ELASTICSEARCH_VERSION "1.0.0" /* Replace with version number for your extension */
 
 #ifdef PHP_WIN32
 #	define PHP_ELASTICSEARCH_API __declspec(dllexport)

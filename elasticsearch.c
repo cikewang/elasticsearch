@@ -108,7 +108,12 @@ static void curl_es(char *methed, char *url, char *data)
 	response_info.size = 0;    /* no data at this point */
 
 	curl = curl_easy_init();
+	struct curl_slist *list = NULL;
 	if(curl) {
+
+		list = curl_slist_append(list, "Content-type: application/json;charset='utf-8'");
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+
 		/* set url */
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		/* example.com is redirected, so we tell libcurl to follow redirection */
